@@ -1,4 +1,4 @@
-name: SonarQube Scan
+name: Secure Code Review – Full Security Scan
 
 on:
   push:
@@ -7,14 +7,112 @@ on:
     branches: [ "main" ]
 
 jobs:
-  sonar:
+
+  # ===================== SEMGREP =====================
+  semgrep:
+    name: Semgrep Static Analysis
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/ci
+
+  # ===================== CODEQL =====================
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+
+    strategy:
+      matrix:
+        language: [ 'python', 'javascript' ]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@v2
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: http://localhost:9000
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # ===================== BANDIT =====================
+  bandit:
+    name: Bandit Python Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit
+        run: bandit -r . -ll
+
+  # ===================== ESLINT =====================
+  eslint:
+    name: ESLint NodeJS Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install ESLint & Security Plugin
+        run: |
+          npm install
+          npm install eslint eslint-plugin-security --save-dev
+
+      - name: Run ESLint Security Rules
+        run: npx eslint . --ext .js
+
+  # ===================== OWASP DEPENDENCY-CHECK =====================
+  dependency-check:
+    name: OWASP Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@v3
+        with:
+          project: "secure-code-review"
+          path: "."
+          format: "HTML"
+          out: "dependency-check-report"
+          args: >
+            --enableExperimental
+            --failOnCVSS 7
+
+      - name: Upload Dependency-Check Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: dependency-check-report
+
+  # ===================== GITLEAKS =====================
+  gitleaks:
+    name: Gitleaks Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
