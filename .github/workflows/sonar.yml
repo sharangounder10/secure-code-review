@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   sonarqube:
@@ -16,18 +13,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
       - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v2
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          sonar-scanner \
-            -Dsonar.projectKey=secure-code-review \
-            -Dsonar.sources=. \
-            -Dsonar.host.url=http://localhost:9000 \
-            -Dsonar.login=$SONAR_TOKEN
+          SONAR_HOST_URL: http://localhost:9000
