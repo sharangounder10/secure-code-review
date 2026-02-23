@@ -1,2 +1,2 @@
-password = "admin1234"
+password = "123456"
 print(password)
