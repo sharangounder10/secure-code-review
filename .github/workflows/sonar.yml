@@ -15,20 +15,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    # -------------------------
+    # 1. CHECKOUT CODE
+    # -------------------------
+    - name: Checkout repository
       uses: actions/checkout@v4
 
+    # -------------------------
+    # 2. PREPARE REPORTS DIR
+    # -------------------------
     - name: Create reports directory
       run: mkdir -p reports
 
-    # 🔹 SEMGREP
+    # -------------------------
+    # 3. SEMGREP (CLI)
+    # -------------------------
     - name: Run Semgrep
-      uses: returntocorp/semgrep-action@v1
-      with:
-        config: p/owasp-top-ten
-        args: "--sarif --output=reports/semgrep.sarif"
+      run: |
+        pip install semgrep
+        semgrep scan \
+          --config p/owasp-top-ten \
+          --sarif \
+          --output reports/semgrep.sarif \
+          .
 
-    # 🔹 CODEQL
+    # -------------------------
+    # 4. CODEQL (ADVANCED SAST)
+    # -------------------------
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:
@@ -39,19 +52,25 @@ jobs:
       with:
         output: reports/codeql
 
-    # 🔹 BANDIT
+    # -------------------------
+    # 5. BANDIT (PYTHON)
+    # -------------------------
     - name: Run Bandit
       run: |
         pip install bandit
         bandit -r . -f json -o reports/bandit.json || true
 
-    # 🔹 ESLINT
+    # -------------------------
+    # 6. ESLINT + NODE SECURITY
+    # -------------------------
     - name: Run ESLint
       run: |
         npm install eslint eslint-plugin-security --save-dev || true
         npx eslint . -f json -o reports/eslint.json || true
 
-    # 🔹 OWASP DEPENDENCY CHECK
+    # -------------------------
+    # 7. OWASP DEPENDENCY-CHECK
+    # -------------------------
     - name: OWASP Dependency-Check
       uses: dependency-check/Dependency-Check_Action@main
       with:
@@ -60,7 +79,9 @@ jobs:
         format: XML
         out: reports
 
-    # 🔹 GITLEAKS
+    # -------------------------
+    # 8. GITLEAKS (SECRETS)
+    # -------------------------
     - name: Run Gitleaks
       uses: gitleaks/gitleaks-action@v2
       with:
@@ -68,7 +89,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # 🔹 SONARQUBE IMPORT
+    # -------------------------
+    # 9. SONARQUBE IMPORT
+    # -------------------------
     - name: SonarQube Scan
       uses: SonarSource/sonarqube-scan-action@v2
       env:
