@@ -1,18 +1,33 @@
-name: SonarQube Automated Scan
+name: SonarQube Analysis
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
-    jobs:
-  sonar:
+    branches:
+      - main
+
+jobs:
+  sonarqube:
     runs-on: ubuntu-latest
-        steps:
+
+    steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-              - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@v2
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: SonarQube Scan
         env:
-          SONAR_TOKEN: sqp_b2063e7d0747ad3a8418cfe685ed19bcc65107d0
-          SONAR_HOST_URL: http://localhost:9000
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=secure-code-review \
+            -Dsonar.sources=. \
+            -Dsonar.host.url=http://localhost:9000 \
+            -Dsonar.login=$SONAR_TOKEN
