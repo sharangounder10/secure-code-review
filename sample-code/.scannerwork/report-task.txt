@@ -1,6 +1,0 @@
-projectKey=Secure-Code-Review
-serverUrl=http://localhost:9000
-serverVersion=26.2.0.119303
-dashboardUrl=http://localhost:9000/dashboard?id=Secure-Code-Review
-ceTaskId=5cdc9331-4161-4e17-833d-331aa864ebce
-ceTaskUrl=http://localhost:9000/api/ce/task?id=5cdc9331-4161-4e17-833d-331aa864ebce
