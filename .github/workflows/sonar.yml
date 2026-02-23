@@ -25,18 +25,19 @@ jobs:
     # -------------------------
     # 2️⃣ SEMGREP (STATIC RULES)
     # -------------------------
-    - name: Run Semgrep
-      uses: returntocorp/semgrep-action@v1
-      with:
-        config: p/owasp-top-ten
-        generateSarif: true
-      env:
-        SEMGREP_APP_TOKEN: ""
+    # -------------------------
+# 2️⃣ SEMGREP (STATIC RULES)
+# -------------------------
+- name: Create reports directory
+  run: mkdir -p reports
 
-    - name: Save Semgrep report
-      run: |
-        mkdir -p reports
-        mv semgrep.sarif reports/semgrep.sarif
+- name: Run Semgrep
+  uses: returntocorp/semgrep-action@v1
+  with:
+    config: p/owasp-top-ten
+    args: >
+      --sarif
+      --output=reports/semgrep.sarif
 
     # -------------------------
     # 3️⃣ CODEQL (ADVANCED ANALYSIS)
