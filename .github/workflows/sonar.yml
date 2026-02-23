@@ -1,4 +1,4 @@
-name: Secure Code Review – Full Security Scan
+name: Secure Code Review – Unified SonarQube Pipeline
 
 on:
   push:
@@ -7,112 +7,85 @@ on:
     branches: [ "main" ]
 
 jobs:
-
-  # ===================== SEMGREP =====================
-  semgrep:
-    name: Semgrep Static Analysis
+  security-scans:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: p/ci
-
-  # ===================== CODEQL =====================
-  codeql:
-    name: CodeQL Analysis
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      contents: read
-      actions: read
-
-    strategy:
-      matrix:
-        language: [ 'python', 'javascript' ]
 
     steps:
-      - uses: actions/checkout@v4
+    - name: Checkout Code
+      uses: actions/checkout@v4
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: ${{ matrix.language }}
+    # ================================
+    # SEMGREP → SARIF
+    # ================================
+    - name: Run Semgrep
+      run: |
+        pip install semgrep
+        semgrep scan --config p/ci --sarif > reports/semgrep.sarif
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+    # ================================
+    # CODEQL → SARIF
+    # ================================
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: javascript, python
 
-      - name: Run CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@v3
 
-  # ===================== BANDIT =====================
-  bandit:
-    name: Bandit Python Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        output: reports
+        format: sarif
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
+    # ================================
+    # BANDIT → JSON
+    # ================================
+    - name: Bandit Scan
+      run: |
+        pip install bandit
+        bandit -r . -f json -o reports/bandit.json
 
-      - name: Install Bandit
-        run: pip install bandit
+    # ================================
+    # ESLINT → JSON
+    # ================================
+    - name: ESLint Security Scan
+      run: |
+        npm install
+        npm install eslint eslint-plugin-security --save-dev
+        npx eslint . -f json -o reports/eslint.json || true
 
-      - name: Run Bandit
-        run: bandit -r . -ll
+    # ================================
+    # OWASP DEPENDENCY CHECK → XML
+    # ================================
+    - name: Dependency Check
+      uses: dependency-check/Dependency-Check_Action@v3
+      with:
+        project: "secure-code-review"
+        path: "."
+        format: "XML"
+        out: "reports"
 
-  # ===================== ESLINT =====================
-  eslint:
-    name: ESLint NodeJS Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    # ================================
+    # GITLEAKS → SARIF
+    # ================================
+    - name: Gitleaks Scan
+      uses: gitleaks/gitleaks-action@v2
+      with:
+        args: detect --report-format sarif --report-path reports/gitleaks.sarif
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install ESLint & Security Plugin
-        run: |
-          npm install
-          npm install eslint eslint-plugin-security --save-dev
-
-      - name: Run ESLint Security Rules
-        run: npx eslint . --ext .js
-
-  # ===================== OWASP DEPENDENCY-CHECK =====================
-  dependency-check:
-    name: OWASP Dependency Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run OWASP Dependency-Check
-        uses: dependency-check/Dependency-Check_Action@v3
-        with:
-          project: "secure-code-review"
-          path: "."
-          format: "HTML"
-          out: "dependency-check-report"
-          args: >
-            --enableExperimental
-            --failOnCVSS 7
-
-      - name: Upload Dependency-Check Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: dependency-check-report
-
-  # ===================== GITLEAKS =====================
-  gitleaks:
-    name: Gitleaks Secret Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+    # ================================
+    # SONAR SCANNER CLI (IMPORT ALL)
+    # ================================
+    - name: SonarScanner CLI
+      env:
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      run: |
+        sonar-scanner \
+        -Dsonar.projectKey=secure-code-review \
+        -Dsonar.sources=. \
+        -Dsonar.host.url=$SONAR_HOST_URL \
+        -Dsonar.login=$SONAR_TOKEN \
+        -Dsonar.externalIssuesReportPaths=reports/semgrep.sarif,reports/codeql.sarif,reports/bandit.json,reports/eslint.json,reports/dependency-check.xml,reports/gitleaks.sarif
