@@ -1,4 +1,4 @@
-name: Secure Code Review – Unified SonarQube Pipeline
+name: Security Scans
 
 on:
   push:
@@ -6,59 +6,70 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# 🔑 REQUIRED for CodeQL + security uploads
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   security-scans:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Code
+    # -------------------------
+    # 1️⃣ CHECKOUT CODE
+    # -------------------------
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    # ================================
-    # SEMGREP → SARIF
-    # ================================
+    # -------------------------
+    # 2️⃣ SEMGREP (STATIC RULES)
+    # -------------------------
     - name: Run Semgrep
-      run: |
-        pip install semgrep
-        semgrep scan --config p/ci --sarif > reports/semgrep.sarif
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: p/owasp-top-ten
+        generateSarif: true
+      env:
+        SEMGREP_APP_TOKEN: ""
 
-    # ================================
-    # CODEQL → SARIF
-    # ================================
+    - name: Save Semgrep report
+      run: |
+        mkdir -p reports
+        mv semgrep.sarif reports/semgrep.sarif
+
+    # -------------------------
+    # 3️⃣ CODEQL (ADVANCED ANALYSIS)
+    # -------------------------
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: javascript, python
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
-
-    - name: Run CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v4
       with:
-        output: reports
-        format: sarif
+        output: reports/codeql
 
-    # ================================
-    # BANDIT → JSON
-    # ================================
-    - name: Bandit Scan
+    # -------------------------
+    # 4️⃣ BANDIT (PYTHON SECURITY)
+    # -------------------------
+    - name: Run Bandit
       run: |
         pip install bandit
-        bandit -r . -f json -o reports/bandit.json
+        bandit -r . -f json -o reports/bandit.json || true
 
-    # ================================
-    # ESLINT → JSON
-    # ================================
-    - name: ESLint Security Scan
+    # -------------------------
+    # 5️⃣ ESLINT + NODE SECURITY
+    # -------------------------
+    - name: Run ESLint
       run: |
-        npm install
-        npm install eslint eslint-plugin-security --save-dev
+        npm install eslint eslint-plugin-security --save-dev || true
         npx eslint . -f json -o reports/eslint.json || true
 
-    # ================================
-    # OWASP DEPENDENCY CHECK → XML
-    # ================================
+    # -------------------------
+    # 6️⃣ OWASP DEPENDENCY-CHECK
+    # -------------------------
     - name: OWASP Dependency-Check
       uses: dependency-check/Dependency-Check_Action@main
       with:
@@ -67,25 +78,32 @@ jobs:
         format: "XML"
         out: "reports"
 
-    # ================================
-    # GITLEAKS → SARIF
-    # ================================
-    - name: Gitleaks Scan
+    # -------------------------
+    # 7️⃣ GITLEAKS (SECRETS)
+    # -------------------------
+    - name: Run Gitleaks
       uses: gitleaks/gitleaks-action@v2
       with:
-        args: detect --report-format sarif --report-path reports/gitleaks.sarif
+        args: detect --source . --report-format sarif --report-path reports/gitleaks.sarif
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # ================================
-    # SONAR SCANNER CLI (IMPORT ALL)
-    # ================================
-    - name: SonarScanner CLI
+    # -------------------------
+    # 8️⃣ SONARSCANNER CLI
+    # -------------------------
+    - name: SonarQube Scan
+      uses: SonarSource/sonarqube-scan-action@v2
       env:
         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      run: |
-        sonar-scanner \
-        -Dsonar.projectKey=secure-code-review \
-        -Dsonar.sources=. \
-        -Dsonar.host.url=$SONAR_HOST_URL \
-        -Dsonar.login=$SONAR_TOKEN \
-        -Dsonar.externalIssuesReportPaths=reports/semgrep.sarif,reports/codeql.sarif,reports/bandit.json,reports/eslint.json,reports/dependency-check.xml,reports/gitleaks.sarif
+      with:
+        args: >
+          -Dsonar.projectKey=secure-code-review
+          -Dsonar.sources=.
+          -Dsonar.externalIssuesReportPaths=
+          reports/semgrep.sarif,
+          reports/codeql/*.sarif,
+          reports/bandit.json,
+          reports/eslint.json,
+          reports/dependency-check-report.xml,
+          reports/gitleaks.sarif
