@@ -1,0 +1,18 @@
+name: SonarQube Automated Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+    jobs:
+  sonar:
+    runs-on: ubuntu-latest
+        steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+              - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v2
+        env:
+          SONAR_TOKEN: sqp_b2063e7d0747ad3a8418cfe685ed19bcc65107d0
+          SONAR_HOST_URL: http://localhost:9000
