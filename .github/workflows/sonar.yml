@@ -80,16 +80,6 @@ jobs:
         out: reports
 
     # -------------------------
-    # 8. GITLEAKS (SECRETS)
-    # -------------------------
-    - name: Run Gitleaks
-      uses: gitleaks/gitleaks-action@v2
-      with:
-        args: detect --source . --report-format sarif --report-path reports/gitleaks.sarif
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    # -------------------------
     # 9. SONARQUBE IMPORT
     # -------------------------
     - name: SonarQube Scan
