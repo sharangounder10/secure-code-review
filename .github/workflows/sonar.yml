@@ -59,8 +59,8 @@ jobs:
     # ================================
     # OWASP DEPENDENCY CHECK → XML
     # ================================
-    - name: Dependency Check
-      uses: dependency-check/Dependency-Check_Action@v3
+    - name: OWASP Dependency-Check
+      uses: dependency-check/Dependency-Check_Action@v2
       with:
         project: "secure-code-review"
         path: "."
