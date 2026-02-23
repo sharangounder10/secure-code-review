@@ -78,17 +78,3 @@ jobs:
         path: .
         format: XML
         out: reports
-
-    # -------------------------
-    # 9. SONARQUBE IMPORT
-    # -------------------------
-    - name: SonarQube Scan
-      uses: SonarSource/sonarqube-scan-action@v2
-      env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      with:
-        args: >
-          -Dsonar.projectKey=secure-code-review
-          -Dsonar.sources=.
-          -Dsonar.externalIssuesReportPaths=reports/semgrep.sarif,reports/codeql/*.sarif,reports/bandit.json,reports/eslint.json,reports/dependency-check-report.xml,reports/gitleaks.sarif
