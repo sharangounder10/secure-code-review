@@ -64,3 +64,11 @@ jobs:
         path: .
         format: XML
         out: reports
+            # -------------------------
+    # 8. UPLOAD REPORTS AS ARTIFACTS
+    # -------------------------
+    - name: Upload security scan reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-scan-reports
+        path: reports/
